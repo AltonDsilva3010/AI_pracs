@@ -1,72 +1,63 @@
 class State:
-    def __init__(self,cannibalL,missionaryL,boatPosition,cannibalR,missionaryR):
-        self.cannibalL=int(cannibalL)
-        self.missionaryL=int(missionaryL)
-        self.cannibalR=int(cannibalR)
-        self.missionaryR=int(missionaryR)
-        self.boatPosition=boatPosition
-        self.parentState=None
-        
-    def isValid(self,state):
-        if state.missionaryL >= 0 and state.missionaryR >= 0 and state.cannibalL >= 0 and state.cannibalR >= 0 and (state.missionaryL == 0 or state.missionaryL >= state.cannibalL) and (state.missionaryR == 0 or state.missionaryR >= state.cannibalR): 
-            return True
-        return False
-    		
-    def testAndAdd(self,successors,newState):
-	    if self.isValid(newState):
-	        newState.parentState=self
-            successors.append(newState)
-	    return
-		
-    def generateSuccessors(self):
-        successors=[]
-        if(self.boatPosition=="LEFT"):
-            self.testAndAdd(successors,State(self.cannibalL,self.missionaryL - 2,"RIGHT",self.cannibalR,self.missionaryR + 2)) # Two missionaries cross left to right.
-            self.testAndAdd(successors,State(self.cannibalL - 2, self.missionaryL, "RIGHT",self.cannibalR + 2, self.missionaryR)) # Two cannibals cross left to right.
-            self.testAndAdd(successors, State(self.cannibalL - 1, self.missionaryL - 1, "RIGHT",self.cannibalR + 1, self.missionaryR + 1)) # One missionary and one cannibal cross left to right.
-            self.testAndAdd(successors, State(self.cannibalL, self.missionaryL - 1, "RIGHT",self.cannibalR, self.missionaryR + 1)) # One missionary crosses left to right.
-            self.testAndAdd(successors, State(self.cannibalL - 1, self.missionaryL, "RIGHT",self.cannibalR + 1, self.missionaryR)) # One cannibal crosses left to right
-        else:
-            self.testAndAdd(successors, State(self.cannibalL, self.missionaryL + 2,"LEFT",self.cannibalR, self.missionaryR - 2)) # Two missionaries cross right to left.
-            self.testAndAdd(successors, State(self.cannibalL + 2, self.missionaryL,"LEFT",self.cannibalR - 2, self.missionaryR)) # Two cannibals cross right to left.
-            self.testAndAdd(successors, State(self.cannibalL + 1, self.missionaryL + 1,"LEFT",self.cannibalR - 1, self.missionaryR - 1)) # One missionary and one cannibal cross right to left.
-            self.testAndAdd(successors, State(self.cannibalL, self.missionaryL + 1,"LEFT",self.cannibalR, self.missionaryR - 1)) # One missionary crosses right to left.
-            self.testAndAdd(successors, State(self.cannibalL + 1, self.missionaryL,"LEFT",self.cannibalR - 1, self.missionaryR)) # One cannibal crosses right to left
-        return successors
-		
-def bfs(initialState):
-    if initialState.cannibalL==0 and initialState.missionaryL==0:
-        return initialState
-    frontier=[]
-    explored=set()
-    frontier.append(initialState)
-    while True:
-        if len(frontier)==0:
-            return None
-        state=frontier.pop(0)
-        explored.add(state)
-        successors=state.generateSuccessors()
-        for child in successors:
-            if child not in explored or child not in frontier:
-                if  child.cannibalL==0 and child.missionaryL==0:
-                    return child
-                frontier.append(child)
-        
-			
-state=State(3,3,"LEFT",0,0)
-state.parentState=None
-solution=bfs(state)
-if solution==None:
-    print("No solution was found")
-else:
-    path=[]
-    child=solution
-    while(child!=None):
-        path.append(child)
-        child=child.parentState
-    depth=len(path)-1
-    print("C-L  M-L  Boat  C-R  M-R")
-    for i in range(depth,-1,-1):
-        child=path[i]
-        print(f"({child.cannibalL}    {child.missionaryL}   {child.boatPosition}   {child.cannibalR}   {child.missionaryR})")
-        print()
+    def __init__(self, m_left, c_left, m_right, c_right, boat_side):
+        self.m_left = m_left
+        self.c_left = c_left
+        self.m_right = m_right
+        self.c_right = c_right
+        self.boat_side = boat_side
+        self.parent = None
+
+    def is_valid(self):
+        if self.m_left < 0 or self.c_left < 0 or self.m_right < 0 or self.c_right < 0:
+            return False
+        if self.m_left != 0 and self.m_left < self.c_left:
+            return False
+        if self.m_right != 0 and self.m_right < self.c_right:
+            return False
+        return True
+
+    def is_goal(self):
+        return self.m_left == 0 and self.c_left == 0
+
+def successors(state):
+    children = []
+    if state.boat_side == 'left':
+        for m in range(3):
+            for c in range(3):
+                if m + c >= 1 and m + c <= 2:
+                    new_state = State(state.m_left - m, state.c_left - c, state.m_right + m, state.c_right + c, 'right')
+                    if new_state.is_valid():
+                        new_state.parent = state
+                        children.append(new_state)
+    else:
+        for m in range(3):
+            for c in range(3):
+                if m + c >= 1 and m + c <= 2:
+                    new_state = State(state.m_left + m, state.c_left + c, state.m_right - m, state.c_right - c, 'left')
+                    if new_state.is_valid():
+                        new_state.parent = state
+                        children.append(new_state)
+    return children
+
+def bfs(start_state):
+    visited, queue = set(), [start_state]
+    while queue:
+        state = queue.pop(0)
+        if state.is_goal():
+            path = []
+            while state.parent:
+                path.append(state)
+                state = state.parent
+            path.append(state)
+            path.reverse()
+            return path
+        visited.add((state.m_left, state.c_left, state.m_right, state.c_right, state.boat_side))
+        for child in successors(state):
+            if (child.m_left, child.c_left, child.m_right, child.c_right, child.boat_side) not in visited:
+                queue.append(child)
+                visited.add((child.m_left, child.c_left, child.m_right, child.c_right, child.boat_side))
+
+start_state = State(3, 3, 0, 0, 'left')
+path = bfs(start_state)
+for state in path:
+    print(f"State({state.m_left}, {state.c_left}, {state.m_right}, {state.c_right}, '{state.boat_side}')")
