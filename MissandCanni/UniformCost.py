@@ -1,82 +1,68 @@
-from queue import PriorityQueue
-
 class State:
-    def __init__(self, left_m, left_c, boat_pos):
-        self.left_m = left_m
-        self.left_c = left_c
-        self.boat_pos = boat_pos
-
-    def __lt__(self, other):
-        return False
-
-    def __eq__(self, other):
-        return (self.left_m == other.left_m and
-                self.left_c == other.left_c and
-                self.boat_pos == other.boat_pos)
-
-    def __hash__(self):
-        return hash((self.left_m, self.left_c, self.boat_pos))
+    def __init__(self, m_left, c_left, m_right, c_right, boat_side):
+        self.m_left = m_left
+        self.c_left = c_left
+        self.m_right = m_right
+        self.c_right = c_right
+        self.boat_side = boat_side
+        self.parent = None
+        self.cost = 0
 
     def is_valid(self):
-        if self.left_m < 0 or self.left_c < 0 or self.left_m > 3 or self.left_c > 3:
+        if self.m_left < 0 or self.c_left < 0 or self.m_right < 0 or self.c_right < 0:
             return False
-        if self.left_c > self.left_m and self.left_m > 0:
+        if self.m_left != 0 and self.m_left < self.c_left:
             return False
-        if 3 - self.left_c > 3 - self.left_m and 3 - self.left_m > 0:
+        if self.m_right != 0 and self.m_right < self.c_right:
             return False
         return True
 
-    def get_successors(self):
-        successors = []
-        if self.boat_pos == 'left':
-            for i in range(3):
-                for j in range(3):
-                    if i+j > 2:
-                        continue
-                    state = State(self.left_m - i, self.left_c - j, 'right')
-                    if state.is_valid():
-                        successors.append((state, (i, j)))
-        else:
-            for i in range(3):
-                for j in range(3):
-                    if i+j > 2:
-                        continue
-                    state = State(self.left_m + i, self.left_c + j, 'left')
-                    if state.is_valid():
-                        successors.append((state, (i, j)))
-        return successors
+    def is_goal(self):
+        return self.m_left == 0 and self.c_left == 0
 
-def ucs(start_state):
+def successors(state):
+    children = []
+    if state.boat_side == 'left':
+        for m in range(3):
+            for c in range(3):
+                if m + c >= 1 and m + c <= 2:
+                    new_state = State(state.m_left - m, state.c_left - c, state.m_right + m, state.c_right + c, 'right')
+                    if new_state.is_valid():
+                        new_state.parent = state
+                        new_state.cost = state.cost + 1
+                        children.append((new_state, new_state.cost))
+    else:
+        for m in range(3):
+            for c in range(3):
+                if m + c >= 1 and m + c <= 2:
+                    new_state = State(state.m_left + m, state.c_left + c, state.m_right - m, state.c_right - c, 'left')
+                    if new_state.is_valid():
+                        new_state.parent = state
+                        new_state.cost = state.cost + 1
+                        children.append((new_state, new_state.cost))
+    return children
+
+def uniform_cost_search(start_state):
     visited = set()
-    pq = PriorityQueue()
-    pq.put((0, start_state, []))
+    queue = [(start_state, 0)]
+    while queue:
+        state, cost = queue.pop(0)
+        if state.is_goal():
+            path = []
+            while state.parent:
+                path.append(state)
+                state = state.parent
+            path.append(state)
+            path.reverse()
+            return path
+        visited.add((state.m_left, state.c_left, state.m_right, state.c_right, state.boat_side))
+        for child, child_cost in successors(state):
+            if (child.m_left, child.c_left, child.m_right, child.c_right, child.boat_side) not in visited:
+                queue.append((child, child_cost))
+                visited.add((child.m_left, child.c_left, child.m_right, child.c_right, child.boat_side))
+        queue = sorted(queue, key=lambda x: x[1])
 
-    while not pq.empty():
-        cost, state, path = pq.get()
-
-        if state not in visited:
-            visited.add(state)
-
-            if state.left_m == 0 and state.left_c == 0 and state.boat_pos == 'right':
-                return path + [(state, (0, 0))]
-
-            for successor, step_cost in state.get_successors():
-                pq.put((cost + 1, successor, path + [(state, step_cost)]))
-
-    return None
-
-start_state = State(3, 3, 'left')
-solution = ucs(start_state)
-
-if solution is None:
-    print("No solution found")
-else:
-    print("Solution found with cost", solution[-1][1])
-    for state, step_cost in solution:
-        if step_cost == (0, 0):
-            print("Boat is now on the", state.boat_pos, "bank")
-        else:
-            print("Boat moved", step_cost[0], "missionaries and", step_cost[1], "cannibals from", state.boat_pos, "to the other bank")
-        print("Left bank:", state.left_m, "M", state.left_c, "C")
-        print("Right bank:", 3 - state.left_m, "M", 3 - state.left_c, "C")
-        print()
+start_state = State(3, 3, 0, 0, 'left')
+path = uniform_cost_search(start_state)
+for state in path:
+    print(f"State({state.m_left}, {state.c_left}, {state.m_right}, {state.c_right}, '{state.boat_side}')")

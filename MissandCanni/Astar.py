@@ -1,57 +1,83 @@
 from queue import PriorityQueue
 
-# Heuristic function to estimate the cost of reaching the goal state from the current state
-#The heuristic function used in this code is h1 which simply returns the number of missionaries and cannibals on the wrong side of the river.
-def heuristic(state):
-    m_left, c_left, b_pos, m_right, c_right = state
-    return (m_left + c_left - 2) // 2 + (m_right + c_right - 2) // 2
+class State:
+    def __init__(self, m_left, c_left, m_right, c_right, boat_side):
+        self.m_left = m_left
+        self.c_left = c_left
+        self.m_right = m_right
+        self.c_right = c_right
+        self.boat_side = boat_side
+        self.parent = None
+        self.depth = 0
 
-# Function to check if a state is valid
-def is_valid(state):
-    m_left, c_left, b_pos, m_right, c_right = state
-    if m_left < 0 or c_left < 0 or m_right < 0 or c_right < 0:
-        return False
-    if m_left > 3 or c_left > 3 or m_right > 3 or c_right > 3:
-        return False
-    if (c_left > m_left > 0) or (c_right > m_right > 0):
-        return False
-    return True
+    def is_valid(self):
+        if self.m_left < 0 or self.c_left < 0 or self.m_right < 0 or self.c_right < 0:
+            return False
+        if self.m_left != 0 and self.m_left < self.c_left:
+            return False
+        if self.m_right != 0 and self.m_right < self.c_right:
+            return False
+        return True
 
-# Function to generate the next valid states from the current state
-def next_states(state):
-    m_left, c_left, b_pos, m_right, c_right = state
-    if b_pos == 'left':
-        moves = [(2, 0), (0, 2), (1, 1), (1, 0), (0, 1)]
-        next_states = [(m_left-m, c_left-c, 'right', m_right+m, c_right+c) for m, c in moves]
+    def is_goal(self):
+        return self.m_left == 0 and self.c_left == 0
+
+    def __lt__(self, other):
+        return (self.depth + self.heuristic()) < (other.depth + other.heuristic())
+
+    def __eq__(self, other):
+        return (self.m_left, self.c_left, self.m_right, self.c_right, self.boat_side) == (other.m_left, other.c_left, other.m_right, other.c_right, other.boat_side)
+
+    def __hash__(self):
+        return hash((self.m_left, self.c_left, self.m_right, self.c_right, self.boat_side))
+
+    def heuristic(self):
+        return self.m_left + self.c_left
+
+def successors(state):
+    children = []
+    if state.boat_side == 'left':
+        for m in range(3):
+            for c in range(3):
+                if m + c >= 1 and m + c <= 2:
+                    new_state = State(state.m_left - m, state.c_left - c, state.m_right + m, state.c_right + c, 'right')
+                    if new_state.is_valid():
+                        new_state.parent = state
+                        new_state.depth = state.depth + 1
+                        children.append(new_state)
     else:
-        moves = [(-2, 0), (0, -2), (-1, -1), (-1, 0), (0, -1)]
-        next_states = [(m_left+m, c_left+c, 'left', m_right-m, c_right-c) for m, c in moves]
-    return [state for state in next_states if is_valid(state)]
+        for m in range(3):
+            for c in range(3):
+                if m + c >= 1 and m + c <= 2:
+                    new_state = State(state.m_left + m, state.c_left + c, state.m_right - m, state.c_right - c, 'left')
+                    if new_state.is_valid():
+                        new_state.parent = state
+                        new_state.depth = state.depth + 1
+                        children.append(new_state)
+    return children
 
-# A* algorithm with a heuristic function
-def a_star(start_state):
-    frontier = PriorityQueue()
-    frontier.put((heuristic(start_state), [start_state]))
-    explored = set()
-    
-    while not frontier.empty():
-        path = frontier.get()[1]
-        current_state = path[-1]
-        
-        if current_state == (0, 0, 'right', 3, 3):
+def astar(start_state):
+    visited = set()
+    queue = PriorityQueue()
+    start_state.depth = 0
+    queue.put(start_state)
+    while not queue.empty():
+        state = queue.get()
+        if state.is_goal():
+            path = []
+            while state.parent:
+                path.append(state)
+                state = state.parent
+            path.append(state)
+            path.reverse()
             return path
-        
-        for next_state in next_states(current_state):
-            if next_state not in explored:
-                new_path = path + [next_state]
-                frontier.put((len(new_path) + heuristic(next_state), new_path))
-                explored.add(next_state)
-    
-    return None
+        visited.add(state)
+        for child in successors(state):
+            if child not in visited:
+                queue.put(child)
+                visited.add(child)
 
-# Testing the algorithm with the initial state (3, 3, 'left', 0, 0)
-path = a_star((3, 3, 'left', 0, 0))
-
-# Printing the path from the initial state to the goal state
+start_state = State(3, 3, 0, 0, 'left')
+path = astar(start_state)
 for state in path:
-    print(state)
+    print(f"State({state.m_left}, {state.c_left}, {state.m_right}, {state.c_right}, '{state.boat_side}')")
